@@ -15,6 +15,8 @@ typedef struct {
 #define FONT_LINES 1027
 FontData font[FONT_LINES];
 
+
+
 // ----------------------
 // Global drawing cursor
 // ----------------------
@@ -121,7 +123,8 @@ int main() {
 
         // LF = 10 → move down by 5mm
         if (ch == 10) {
-            cursorY -= (int)(5.0 * scale);
+            cursorX = 0;               // ★ 保证第二行从同样的位置开始
+            cursorY -= (int)(40.0 * scale); 
             continue;
         }
 
