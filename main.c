@@ -1,146 +1,54 @@
+// main.c
 #include <stdio.h>
 #include <stdlib.h>
 #include "platform.h"
 #include "serial.h"
+#include "font.h"
+#include "function.h"
 
-// ----------------------
-// Font data structure
-// ----------------------
-typedef struct {
-    int a;   // X or command 999
-    int b;   // Y or ASCII
-    int c;   // Pen state or N
-} FontData;
-
-#define FONT_LINES 1027
-FontData font[FONT_LINES];
-
-
-
-// ----------------------
-// Global drawing cursor
-// ----------------------
+// 全局游标和缩放（在 function.c 使用 extern）
 int cursorX = 0;
-int cursorY = 0;
+int cursorY = 200;    // 基线位置（可调），越大字显示越靠上（模拟器坐标系）
+float scale = 8.0f;   // 推荐起始值 6~20 之间，根据需要调整
 
-float scale = 8.0;   // character scaling
-
-// ----------------------
-// Load font file
-// ----------------------
-void LoadFontData() {
-    FILE *fp = fopen("SingleStrokeFont.txt", "r");
-    if (!fp) {
-        printf("Error: Cannot open SingleStrokeFont.txt\n");
-        exit(1);
-    }
-
-    for (int i = 0; i < FONT_LINES; i++) {
-        if (fscanf(fp, "%d %d %d", &font[i].a, &font[i].b, &font[i].c) != 3) {
-            printf("Error reading font file at line %d\n", i);
-            fclose(fp);
-            exit(1);
-        }
-    }
-
-    fclose(fp);
-
-    // ⭐⭐⭐ 加入调试输出 ———— 检查字体文件是否正常加载
-    printf("DEBUG: font[0] = %d %d %d\n", font[0].a, font[0].b, font[0].c);
-    printf("DEBUG: font[1] = %d %d %d\n", font[1].a, font[1].b, font[1].c);
-}
-
-// ----------------------
-// Draw a character using the font data
-// ----------------------
-void DrawChar(int ascii)
+int main(void)
 {
-    int maxX = 0;
-
-    for (int i = 0; i < FONT_LINES; i++)
-    {
-        if (font[i].a == 999 && font[i].b == ascii)
-        {
-            int N = font[i].c;
-
-            for (int j = 1; j <= N; j++)
-            {
-                int dx  = font[i+j].a;
-                int dy  = font[i+j].b;
-                int pen = font[i+j].c;
-
-                // ⭐ dx, dy = ABSOLUTE FONT POINTS — DO NOT ACCUMULATE!
-                if (dx > maxX)
-                    maxX = dx;
-
-                int worldX = cursorX + (int)(dx * scale);
-                int worldY = cursorY + (int)(dy * scale);
-
-                if (pen == 0) {
-                    PenUp();
-                    MoveTo(worldX, worldY);
-                } else {
-                    PenDown();
-                    DrawTo(worldX, worldY);
-                }
-            }
-
-            cursorX += (int)(maxX * scale) + 5;  // 字间距
-
-            return;
-        }
-    }
-}
-
-
-// ----------------------
-// Main Program
-// ----------------------
-int main() {
-    printf("DEBUG: Program started!\n");
-
-    LoadFontData();   // ← 会打印 DEBUG 信息
+    // 加载字体文件（SingleStrokeFont.txt 必须在程序运行的当前目录）
     LoadFontData();
 
-    printf("DEBUG: font[0] = %d %d %d\n", font[0].a, font[0].b, font[0].c);
-    printf("DEBUG: font[1] = %d %d %d\n", font[1].a, font[1].b, font[1].c);
-
+    // 打开要写的文本（Test.txt 必须与 exe 同目录，或指定绝对路径）
     FILE *fp = fopen("Test.txt", "r");
     if (!fp) {
-        printf("Error: Cannot open Test.txt\n");
+        printf("Cannot open Test.txt\n");
         return 1;
     }
 
-    char ch;
-
+    int ch;
+    // 逐字符读取并绘制
     while ((ch = fgetc(fp)) != EOF) {
-
-        // CR = 13 → reset X
+        // CR (13) 只复位 X（回到行首）
         if (ch == 13) {
             cursorX = 0;
             continue;
         }
-
-        // LF = 10 → move down by 5mm
+        // LF (10) 换行：回到行首并向下移动 baseline
         if (ch == 10) {
-            cursorX = 0;               // ★ 保证第二行从同样的位置开始
-            cursorY -= (int)(40.0 * scale); 
+            cursorX = 0;
+            // 计算合理的行高：字体内高度大约 20 units -> lineHeight = 20*scale + 40 pixels
+            int lineHeight = (int)(20.0f * scale) + 40;
+            cursorY -= lineHeight;   // 向下移动（坐标系依你模拟器方向而定）
             continue;
         }
 
-        // Draw normal character
+        // 正常字符
         DrawChar((int)ch);
     }
 
     fclose(fp);
 
-    // End at origin with pen up
+    // 收尾：抬笔并回到原点
     PenUp();
     MoveTo(0, 0);
 
     return 0;
 }
-
-
-
-
